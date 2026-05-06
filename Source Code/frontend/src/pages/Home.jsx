@@ -138,9 +138,13 @@ const Home = () => {
       const backendMessage = error?.response?.data?.message;
       const backendCode = error?.response?.data?.code;
 
+      // Prefer backend-provided message.
+      // If backend doesn't return message (or returns generic 500), avoid the old hardcoded quota text.
       const text = backendMessage || (backendCode === 'GEMINI_QUOTA_EXPIRED'
         ? 'Your AI quota is expired. Try again later.'
-        : 'Chat failed. Please try again.');
+        : (backendCode
+            ? `Chat failed (${backendCode}). Please try again.`
+            : 'Chat failed. Please try again.'));
 
       const errorMsg = {
         id: Date.now() + 1,

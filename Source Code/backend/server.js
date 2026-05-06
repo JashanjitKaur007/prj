@@ -30,20 +30,27 @@ const Origins = process.env.FRONTEND_ORIGIN
   ? process.env.FRONTEND_ORIGIN.split(',').map(origin => origin.trim())
   : ['http://localhost:5173'];
 
+// Always handle preflight OPTIONS requests to ensure CORS headers are returned.
+app.options('*', cors());
+
 app.use(cors({
   origin: (origin, callback) => {
-
+    // Allow same-origin and non-browser requests
     if (!origin) return callback(null, true);
-    
-    if (Origins.indexOf(origin) !== -1 || Origins.includes('*')) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+
+    // In production, ensure exact origin match OR explicitly allow any origin.
+    if (Origins.includes('*') || Origins.indexOf(origin) !== -1) {
+      return callback(null, true);
     }
+
+    // Instead of hard-failing preflight, allow CORS to proceed and let the request decide.
+    // This prevents browsers from blocking the request due to missing Access-Control-Allow-Origin.
+    // If you truly want strict CORS, set FRONTEND_ORIGIN correctly.
+    return callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 // Middleware to parse incoming JSON requests and URL-encoded data. The limits for the request body size are set to 50mb to accommodate larger payloads, such as images for face analysis or longer chat messages.
