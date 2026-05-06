@@ -14,4 +14,3 @@ Current Working Directory: `c:/Users/jasha/Desktop/project - Copy/Source Code` (
 **Next Step**: Complete #1 below, then `git add . && git commit -m "add deployment prep" && git push`.
 
 **Commands run from `Source Code/` (cd there first if needed).**
-
