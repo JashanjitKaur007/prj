@@ -30,10 +30,8 @@ const Origins = process.env.FRONTEND_ORIGIN
   ? process.env.FRONTEND_ORIGIN.split(',').map(origin => origin.trim())
   : ['http://localhost:5173'];
 
-// Always handle preflight OPTIONS requests to ensure CORS headers are returned.
-app.options('*', cors());
-
 app.use(cors({
+
   origin: (origin, callback) => {
     // Allow same-origin and non-browser requests
     if (!origin) return callback(null, true);
