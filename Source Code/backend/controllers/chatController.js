@@ -111,13 +111,14 @@ User's message: "${prompt}"
         if (err?.status === 404 || /not found|not supported/i.test(err?.message || '')) {
           continue;
         }
-        throw err; 
+        throw err;
       }
     }
 
     if (!aiResponse) {
       throw lastError || new Error('Failed to get response from any Gemini model');
     }
+
 
     const analysis = extractMentalHealthInfo(aiResponse);
 
@@ -189,17 +190,79 @@ User's message: "${prompt}"
     });
 
   } catch (error) {
+    const reason = error?.errorDetails?.[0]?.reason || error?.response?.data?.error || error?.message;
+
     console.error('generateResponse Error:', {
-      message: error.message,
+      message: error?.message,
       status: error?.status,
-      reason: error?.errorDetails?.[0]?.reason
+      reason
     });
 
-    if (error?.message?.includes('API key') || error?.status === 400) {
-      return res.status(502).json({ message: 'AI service configuration error. Please contact support.' });
+    const msg = String(reason || error?.message || '').toLowerCase();
+
+    // Gemini/GCP common quota/rate-limit/auth failure patterns
+    const isApiKeyOrAuth =
+      msg.includes('api key') ||
+      msg.includes('invalid api key') ||
+      msg.includes('unauthenticated') ||
+      msg.includes('authentication') ||
+      msg.includes('permission denied');
+
+    const isQuotaOrExpired =
+      msg.includes('quota') ||
+      msg.includes('insufficient quota') ||
+      msg.includes('expired') ||
+      msg.includes('billing') ||
+      msg.includes('free tier') ||
+      msg.includes('request is not allowed') ||
+      msg.includes('rate limit') ||
+      msg.includes('per minute') ||
+      msg.includes('too many requests');
+
+    const isRateLimit =
+      error?.status === 429 ||
+      msg.includes('429') ||
+      msg.includes('too many requests') ||
+      msg.includes('rate limit');
+
+    if (isApiKeyOrAuth) {
+      return res.status(401).json({
+        message: 'AI service authentication failed (check API key).',
+        code: 'GEMINI_AUTH_ERROR',
+        details: reason
+      });
     }
 
-    res.status(500).json({ message: 'Failed to generate AI response' });
+    if (isRateLimit) {
+      return res.status(429).json({
+        message: 'AI service is rate limited. Try again in a moment.',
+        code: 'GEMINI_RATE_LIMIT',
+        details: reason
+      });
+    }
+
+    if (isQuotaOrExpired) {
+      return res.status(429).json({
+        message: 'Your AI quota is expired. Try again later.',
+        code: 'GEMINI_QUOTA_EXPIRED',
+        details: reason
+      });
+    }
+
+    // Fallback: preserve status if provided by SDK
+    if (error?.status && Number(error.status) >= 400 && Number(error.status) < 500) {
+      return res.status(error.status).json({
+        message: 'AI request failed.',
+        code: 'GEMINI_REQUEST_FAILED',
+        details: reason
+      });
+    }
+
+    return res.status(500).json({
+      message: 'Failed to generate AI response.',
+      code: 'GEMINI_INTERNAL_ERROR',
+      details: reason
+    });
   }
 };
 

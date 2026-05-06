@@ -134,12 +134,25 @@ const Home = () => {
       setConversation(prev => [...prev, aiMsg]);
     } catch (error) {
       console.error('Chat error:', error);
+
+      const backendMessage = error?.response?.data?.message;
+      const backendCode = error?.response?.data?.code;
+
+      // Prefer backend-provided message.
+      // If backend doesn't return message (or returns generic 500), avoid the old hardcoded quota text.
+      const text = backendMessage || (backendCode === 'GEMINI_QUOTA_EXPIRED'
+        ? 'Your AI quota is expired. Try again later.'
+        : (backendCode
+            ? `Chat failed (${backendCode}). Please try again.`
+            : 'Chat failed. Please try again.'));
+
       const errorMsg = {
         id: Date.now() + 1,
         sender: 'ai',
-        text: "Your Free Qouta has Expired. Try again after sometime.",
+        text,
         timestamp: new Date(),
-        isError: true
+        isError: true,
+        backendCode: backendCode || null
       };
       setConversation(prev => [...prev, errorMsg]);
     } finally {
